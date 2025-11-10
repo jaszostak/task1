@@ -1,6 +1,6 @@
 from flask import render_template, Blueprint, request, redirect, url_for, jsonify
 from project import db
-from project.customers.models import Customer
+from project.customers.models import Customer, _sanitize_text, _validate_age
 
 
 # Blueprint for customers
@@ -35,7 +35,14 @@ def create_customer():
         print('Invalid form data')
         return jsonify({'error': 'Invalid form data'}), 400
 
-    new_customer = Customer(name=data['name'], city=data['city'], age=data['age'])
+    try:
+        name = _sanitize_text(data.get('name'), field="name", maxlen=64)
+        city = _sanitize_text(data.get('city'), field="city", maxlen=64)
+        age = _validate_age(data.get('age'))
+    except Exception as e:
+        return jsonify({'error': f'Invalid input: {str(e)}'}), 400
+
+    new_customer = Customer(name=name, city=city, age=age)
 
     try:
         # Add the new customer to the session and commit to save to the database
@@ -85,9 +92,9 @@ def edit_customer(customer_id):
         data = request.form
 
         # Update customer details
-        customer.name = data['name']
-        customer.city = data['city']
-        customer.age = data['age']
+        customer.name = _sanitize_text(data['name'], field="name", maxlen=64)
+        customer.city = _sanitize_text(data['city'], field="city", maxlen=64)
+        customer.age = _validate_age(data['age'])
 
         # Commit the changes to the database
         db.session.commit()
@@ -97,7 +104,7 @@ def edit_customer(customer_id):
         # Handle any exceptions
         db.session.rollback()
         print('Error updating customer')
-        return jsonify({'error': f'Error updating customer: {str(e)}'}), 500
+        return jsonify({'error': f'Error updating customer: {str(e)}'}), 400
 
 
 # Route to delete a customer
